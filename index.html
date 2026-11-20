@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Staff Time Tracker</title>
+<style>
+:root{--bg:#eef0f8;--card:#fff;--ink:#1b1e33;--mute:#6b7090;--line:#e1e4f2;--soft:#f5f6fc;--ok:#16a34a;--brk:#d97706;--off:#9aa0bd;--out:#dc2626;--pri:#4f5bd5;
+--shadow:0 2px 10px rgba(40,50,110,.08);color-scheme:light;
+box-sizing:border-box;padding-bottom:env(safe-area-inset-bottom,0px)}
+@media(prefers-color-scheme:dark){:root{--bg:#10122a;--card:#1a1d3d;--ink:#eceefb;--mute:#9aa0c4;--line:#2c3060;--soft:#222650;--pri:#7b88f0;--shadow:0 2px 12px rgba(0,0,0,.35);color-scheme:dark}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+header{background:linear-gradient(135deg,#363f8f,#6a56d0);color:#fff;padding:calc(18px + env(safe-area-inset-top,0px)) 16px 22px;text-align:center;border-radius:0 0 22px 22px;box-shadow:var(--shadow)}
+header h1{margin:0;font-size:20px;letter-spacing:1px}
+#clock{margin-top:4px;font-size:30px;font-weight:700;font-variant-numeric:tabular-nums}
+#day{font-size:13px;opacity:.85}
+main{max-width:860px;margin:0 auto;padding:14px}
+h2{font-size:12px;text-transform:uppercase;letter-spacing:1px;color:var(--mute);margin:22px 4px 8px}
+.card{background:var(--card);border-radius:16px;padding:16px;box-shadow:var(--shadow)}
+select,input{font:inherit;color:var(--ink);background:var(--soft);border:1px solid var(--line);border-radius:10px;padding:12px;width:100%}
+select:focus,input:focus{outline:2px solid var(--pri);outline-offset:1px}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.status{text-align:center;font-weight:700;padding:14px;border-radius:12px;margin:14px 0;background:var(--soft);color:var(--mute)}
+.status.working{background:rgba(22,163,74,.12);color:var(--ok)}
+.status.break{background:rgba(217,119,6,.14);color:var(--brk)}
+button{font:inherit;font-weight:700;border:0;border-radius:12px;padding:15px 10px;color:#fff;cursor:pointer;transition:transform .08s,opacity .15s}
+button:active:not(:disabled){transform:scale(.97)}
+button:disabled{opacity:.3;cursor:not-allowed}
+#bIn{background:var(--ok)}#bBrk{background:var(--brk)}#bRes{background:var(--pri)}#bOut{background:var(--out)}
+.mt{margin-top:10px}
+.full{width:100%}
+#bIn{padding:18px 10px;font-size:18px}
+.end{margin-top:18px;padding-top:16px;border-top:1px dashed var(--line)}
+.bad{outline:2px solid var(--out)!important;outline-offset:1px}
+.board{display:grid;grid-template-columns:repeat(auto-fill,minmax(155px,1fr));gap:10px}
+.person{background:var(--card);border-radius:14px;padding:12px;box-shadow:var(--shadow);border-left:5px solid var(--off);display:flex;gap:10px;align-items:center}
+.person.working{border-color:var(--ok)}.person.break{border-color:var(--brk)}
+.av{width:38px;height:38px;border-radius:50%;background:var(--soft);display:grid;place-items:center;font-weight:800;color:var(--pri);flex:none}
+.person b{display:block;line-height:1.2}.person small{color:var(--mute);display:block}
+.person .st{font-weight:700}.person.working .st{color:var(--ok)}.person.break .st{color:var(--brk)}
+.wrap{overflow-x:auto;border-radius:16px;box-shadow:var(--shadow);background:var(--card)}
+table{border-collapse:collapse;width:100%;min-width:780px}
+th{background:linear-gradient(135deg,#363f8f,#6a56d0);color:#fff;text-align:left;padding:11px 12px;font-size:13px;white-space:nowrap}
+td{padding:11px 12px;border-bottom:1px solid var(--line);font-variant-numeric:tabular-nums;white-space:nowrap}
+tbody tr:nth-child(even){background:var(--soft)}
+tbody tr:last-child td{border-bottom:0}
+.pill{background:rgba(106,86,208,.16);color:var(--pri);padding:3px 11px;border-radius:99px;font-weight:700;font-size:14px}
+.note{font-size:13px;color:var(--mute);margin:8px 4px}
+#toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(18px + env(safe-area-inset-bottom,0px));background:#dc2626;color:#fff;padding:11px 16px;border-radius:12px;display:none;box-shadow:var(--shadow)}
+</style>
+</head>
+<body>
+<header>
+  <h1>STAFF TIME TRACKER</h1>
+  <div id="clock">--:--</div>
+  <div id="day"></div>
+</header>
+<main>
+<div id="banner" class="note">Loading…</div>
+
+<h2>Control center</h2>
+<div class="card">
+  <div class="two">
+    <select id="who" aria-label="Staff member"></select>
+    <input id="pin" type="password" inputmode="numeric" placeholder="Your PIN" autocomplete="off">
+  </div>
+  <div id="mystatus" class="status">Pick your name</div>
+  <button id="bIn" class="full">▶ Time In</button>
+  <div class="two mt">
+    <button id="bBrk">☕ On Break</button>
+    <button id="bRes">↺ Resume Work</button>
+  </div>
+  <div class="end">
+    <input id="races" type="number" min="0" inputmode="numeric" placeholder="Number of races done (required for Time Out)">
+    <button id="bOut" class="full mt">■ Time Out</button>
+  </div>
+</div>
+
+<h2>Live tracker</h2>
+<div id="board" class="board"></div>
+
+<h2>Daily shift log</h2>
+<div class="wrap"><table>
+<thead><tr><th>Date</th><th>Name</th><th>Time In</th><th>Time Out</th><th>Duration</th><th>Races</th><th>Breaks (In-Out)</th><th>Break Time</th></tr></thead>
+<tbody id="log"></tbody></table></div>
+<p class="note">Keep calm and stay HYDRATED.</p>
+</main>
+<div id="toast"></div>
+<script>
+const API = "https://script.google.com/macros/s/AKfycbzDfSkflphZP0gWSsmcu_5vqK_yxKYV2wQ3NxE7xwQtWqQUr8qRYF-EJ5u6ifOVWFkOxg/exec";
+const TZ = "Asia/Manila";
+
+const $ = id => document.getElementById(id);
+const esc = s => String(s).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const f12 = new Intl.DateTimeFormat("en-US", { timeZone: TZ, hour: "numeric", minute: "2-digit", hour12: true });
+const hm = t => f12.format(new Date(t));
+const dur = ms => { const m = Math.max(0, Math.round(ms / 60000)); return fmtDur(Math.floor(m / 60), m % 60); };
+const fmtDur = (h, m) => h ? h + "h" + (m ? " " + m + "m" : "") : m + "m";
+const t12 = s => { const m = /^(\d{1,2}):(\d{2})/.exec(s); if (!m) return s; const h = +m[1]; return (h % 12 || 12) + ":" + m[2] + " " + (h >= 12 ? "PM" : "AM"); };
+const d12 = s => { const m = /^(\d{1,2}):(\d{2})/.exec(s); return m ? fmtDur(+m[1], +m[2]) : s; };
+
+let staff = [], live = {}, log = [], offset = 0, busy = false;
+let me = "", pin = "";
+try { me = localStorage.getItem("who") || ""; pin = localStorage.getItem("pin") || ""; } catch (e) {}
+$("pin").value = pin;
+
+function tick() {
+  const now = new Date(Date.now() + offset);
+  $("clock").textContent = new Intl.DateTimeFormat("en-US", { timeZone: TZ, hour: "numeric", minute: "2-digit", second: "2-digit", hour12: true }).format(now);
+  $("day").textContent = new Intl.DateTimeFormat("en-US", { timeZone: TZ, weekday: "long", month: "long", day: "numeric", year: "numeric" }).format(now);
+}
+function toast(msg) { const t = $("toast"); t.textContent = msg; t.style.display = "block"; setTimeout(() => t.style.display = "none", 3500); }
+function elapsed(s) {
+  const now = Date.now() + offset;
+  let b = s.breakMs || 0;
+  if (s.state === "break" && s.breakStart) b += now - s.breakStart;
+  return now - s.timeIn - b;
+}
+
+function render() {
+  $("who").innerHTML = '<option value="">Select your name…</option>' + staff.map(n => `<option ${n === me ? "selected" : ""}>${esc(n)}</option>`).join("");
+  const s = live[me] || { state: "out" };
+  const other = staff.find(n => n !== me && live[n] && live[n].state !== "out");
+  const el = $("mystatus");
+  el.className = "status " + (me ? s.state : "");
+  if (!me) el.textContent = "Pick your name";
+  else if (s.state === "working") el.textContent = "Working since " + hm(s.timeIn) + " · " + dur(elapsed(s));
+  else if (s.state === "break") el.textContent = "On break since " + hm(s.breakStart) + " · worked " + dur(elapsed(s));
+  else if (other) el.textContent = other + " is clocked in. You can Time In after they Time Out.";
+  else el.textContent = "Not clocked in";
+  $("bIn").disabled = busy || !(me && s.state === "out" && !other);
+  $("bBrk").disabled = busy || !(me && s.state === "working");
+  $("bRes").disabled = busy || !(me && s.state === "break");
+  $("bOut").disabled = busy || !(me && s.state !== "out" && live[me]);
+  $("board").innerHTML = staff.map(n => {
+    const x = live[n] || { state: "out" };
+    const txt = x.state === "working" ? "Working" : x.state === "break" ? "On break" : "Off";
+    const sub = x.state === "out" ? "Not clocked in" : "In at " + hm(x.timeIn) + (x.state === "working" ? " · " + dur(elapsed(x)) : " · break since " + hm(x.breakStart));
+    return `<div class="person ${x.state}"><div class="av">${esc(n.charAt(0).toUpperCase())}</div><div><b>${esc(n)}</b><small class="st">${txt}</small><small>${sub}</small></div></div>`;
+  }).join("");
+  $("log").innerHTML = log.map(r =>
+    `<tr><td>${esc(r[0])}</td><td><span class="pill">${esc(r[1])}</span></td><td>${esc(t12(r[2]))}</td><td>${esc(t12(r[3]))}</td><td>${esc(d12(r[4]))}</td><td>${esc(r[5])}</td><td>${esc(r[6] ? String(r[6]).replace(/\d{1,2}:\d{2}/g, t12).replace(/-/g, " – ") : "—")}</td><td>${esc(r[6] ? d12(r[7]) : "—")}</td></tr>`
+  ).join("") || '<tr><td colspan="8" class="note">No shifts yet.</td></tr>';
+}
+
+async function call(params) {
+  const r = await fetch(API + "?" + new URLSearchParams(params));
+  return r.json();
+}
+
+async function refresh() {
+  try {
+    const d = await call({ action: "list" });
+    if (!d.ok) throw new Error(d.error);
+    staff = d.staff; live = d.live; log = d.log; offset = d.now - Date.now();
+    $("banner").textContent = "";
+    render(); tick();
+  } catch (e) { $("banner").textContent = "Can’t reach the tracker right now. Retrying…"; }
+}
+
+async function act(kind) {
+  if (!me) return;
+  pin = $("pin").value.trim();
+  if (!pin) { toast("Enter your PIN first"); return; }
+  const races = $("races").value.trim();
+  $("races").classList.remove("bad");
+  if (kind === "out" && !/^\d+$/.test(races)) {
+    $("races").classList.add("bad"); $("races").focus();
+    toast("Enter the number of races done before Time Out");
+    return;
+  }
+  busy = true; render();
+  try {
+    const d = await call({ action: "act", name: me, pin, kind, races });
+    if (!d.ok) throw new Error(d.error);
+    try { localStorage.setItem("pin", pin); } catch (e) {}
+    if (kind === "out") $("races").value = "";
+    await refresh();
+  } catch (e) { toast(e.message || "Couldn’t save. Try again."); }
+  busy = false; render();
+}
+
+$("bIn").onclick = () => act("in");
+$("bBrk").onclick = () => act("break");
+$("bRes").onclick = () => act("resume");
+$("bOut").onclick = () => act("out");
+$("who").onchange = e => { me = e.target.value; try { localStorage.setItem("who", me); } catch (x) {} render(); };
+
+tick(); setInterval(tick, 1000);
+refresh();
+setInterval(refresh, 8000);
+setInterval(render, 30000);
+</script>
+</body>
+</html>
