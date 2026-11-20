@@ -59,7 +59,7 @@ tbody tr:last-child td{border-bottom:0}
 <main>
 <div id="banner" class="note">Loading…</div>
 
-<h2>Race Project</h2>
+<h2>Control center</h2>
 <div class="card">
   <div class="two">
     <select id="who" aria-label="Staff member"></select>
@@ -84,11 +84,12 @@ tbody tr:last-child td{border-bottom:0}
 <div class="wrap"><table>
 <thead><tr><th>Date</th><th>Name</th><th>Time In</th><th>Time Out</th><th>Duration</th><th>Races</th><th>Breaks (In-Out)</th><th>Break Time</th></tr></thead>
 <tbody id="log"></tbody></table></div>
-<p class="note">Keep calm and stay HYDRATED.</p>
+<p class="note">Showing the latest 30 shifts. The full record is in the Google Sheet.</p>
 </main>
 <div id="toast"></div>
 <script>
-const API = "https://script.google.com/macros/s/AKfycbzDfSkflphZP0gWSsmcu_5vqK_yxKYV2wQ3NxE7xwQtWqQUr8qRYF-EJ5u6ifOVWFkOxg/exec";
+// PASTE YOUR GOOGLE APPS SCRIPT WEB APP URL BETWEEN THE QUOTES:
+const API = "PASTE_WEB_APP_URL_HERE";
 const TZ = "Asia/Manila";
 
 const $ = id => document.getElementById(id);
@@ -100,7 +101,7 @@ const fmtDur = (h, m) => h ? h + "h" + (m ? " " + m + "m" : "") : m + "m";
 const t12 = s => { const m = /^(\d{1,2}):(\d{2})/.exec(s); if (!m) return s; const h = +m[1]; return (h % 12 || 12) + ":" + m[2] + " " + (h >= 12 ? "PM" : "AM"); };
 const d12 = s => { const m = /^(\d{1,2}):(\d{2})/.exec(s); return m ? fmtDur(+m[1], +m[2]) : s; };
 
-let staff = [], live = {}, log = [], offset = 0, busy = false;
+let staff = [], live = {}, log = [], offset = 0, busy = false, inflight = 0;
 let me = "", pin = "";
 try { me = localStorage.getItem("who") || ""; pin = localStorage.getItem("pin") || ""; } catch (e) {}
 $("pin").value = pin;
@@ -150,9 +151,11 @@ async function call(params) {
 }
 
 async function refresh() {
+  if (inflight) return;
   try {
     const d = await call({ action: "list" });
     if (!d.ok) throw new Error(d.error);
+    if (inflight) return;
     staff = d.staff; live = d.live; log = d.log; offset = d.now - Date.now();
     $("banner").textContent = "";
     render(); tick();
@@ -170,15 +173,24 @@ async function act(kind) {
     toast("Enter the number of races done before Time Out");
     return;
   }
-  busy = true; render();
+  const snap = JSON.stringify(live);
+  const now = Date.now() + offset, cur = live[me] || { state: "out", breakMs: 0 };
+  if (kind === "in") live[me] = { state: "working", timeIn: now, breakMs: 0, breakStart: 0 };
+  else if (kind === "break") live[me] = { ...cur, state: "break", breakStart: now };
+  else if (kind === "resume") live[me] = { ...cur, state: "working", breakMs: (cur.breakMs || 0) + now - cur.breakStart, breakStart: 0 };
+  else if (kind === "out") live[me] = { state: "out" };
+  inflight++; render();
+  let ok = false;
   try {
     const d = await call({ action: "act", name: me, pin, kind, races });
     if (!d.ok) throw new Error(d.error);
     try { localStorage.setItem("pin", pin); } catch (e) {}
     if (kind === "out") $("races").value = "";
-    await refresh();
-  } catch (e) { toast(e.message || "Couldn’t save. Try again."); }
-  busy = false; render();
+    staff = d.staff; live = d.live; log = d.log; offset = d.now - Date.now();
+    ok = true;
+  } catch (e) { live = JSON.parse(snap); toast(e.message || "Couldn’t save. Try again."); }
+  inflight--; render(); tick();
+  if (!ok) refresh();
 }
 
 $("bIn").onclick = () => act("in");
